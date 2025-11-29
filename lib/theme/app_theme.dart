@@ -48,9 +48,7 @@ class AppTheme {
         color: cardColor,
         elevation: 3,
         margin: const EdgeInsets.symmetric(vertical: 8),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
 
       // Buttons
@@ -108,14 +106,16 @@ class AppTheme {
       ),
 
       // Text styles
-      textTheme: base.textTheme.apply(
-        bodyColor: Colors.white,
-        displayColor: Colors.white,
-      ).copyWith(
-        titleLarge: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-        bodyLarge: const TextStyle(fontSize: 14, color: Colors.white),
-        bodyMedium: const TextStyle(fontSize: 13, color: Colors.white70),
-      ),
+      textTheme: base.textTheme
+          .apply(bodyColor: Colors.white, displayColor: Colors.white)
+          .copyWith(
+            titleLarge: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+            bodyLarge: const TextStyle(fontSize: 14, color: Colors.white),
+            bodyMedium: const TextStyle(fontSize: 13, color: Colors.white70),
+          ),
     );
   }
 

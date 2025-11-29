@@ -29,16 +29,26 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: _emailCtr.text.trim());
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: _emailCtr.text.trim(),
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password reset email sent. Check your inbox.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password reset email sent. Check your inbox.'),
+        ),
+      );
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? 'Failed to send reset email')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? 'Failed to send reset email')),
+      );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -56,13 +66,32 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
               padding: const EdgeInsets.all(16),
               child: Form(
                 key: _formKey,
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Text('Reset password', style: Theme.of(context).textTheme.titleLarge),
-                  AppTheme.vSpace12,
-                  TextFormField(controller: _emailCtr, decoration: AppTheme.inputDecoration(label: 'Email'), validator: _validateEmail),
-                  AppTheme.vSpace16,
-                  ElevatedButton(onPressed: _loading ? null : _sendReset, child: _loading ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Send reset email')),
-                ]),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Reset password',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    AppTheme.vSpace12,
+                    TextFormField(
+                      controller: _emailCtr,
+                      decoration: AppTheme.inputDecoration(label: 'Email'),
+                      validator: _validateEmail,
+                    ),
+                    AppTheme.vSpace16,
+                    ElevatedButton(
+                      onPressed: _loading ? null : _sendReset,
+                      child: _loading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Send reset email'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
