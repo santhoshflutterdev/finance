@@ -1,0 +1,80 @@
+# ios/Podfile
+# Uncomment this line to define a global platform for your project
+platform :ios, '13.0'
+
+# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig, then run flutter pub get"
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_ios_podfile_setup
+
+target 'Runner' do
+  # Use frameworks - many plugins require it. If you run into issues, you can try removing it,
+  # but keep it for most recent plugin compatibility.
+  use_frameworks!
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  target 'RunnerTests' do
+    inherit! :search_paths
+    # Pods for testing can be added here
+  end
+end
+
+# Post-install: keep flutter defaults and remove any stray '-G' tokens injected by pods or scripts.
+# This is a safe cleanup that only strips the literal '-G' token from common build-setting entries.
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    # Apply Flutter recommended build settings first
+    flutter_additional_ios_build_settings(target)
+
+    # Iterate over each build configuration and sanitize build settings
+    target.build_configurations.each do |config|
+      bs = config.build_settings
+
+      # Keys to sanitize — common places flags might appear
+      keys_to_check = %w[
+        OTHER_CFLAGS
+        OTHER_CPLUSPLUSFLAGS
+        OTHER_LDFLAGS
+        OTHER_SWIFT_FLAGS
+        OTHER_OBJCFLAGS
+        GCC_PREPROCESSOR_DEFINITIONS
+      ]
+
+      keys_to_check.each do |key|
+        next unless bs[key]
+
+        # If the setting is a string, remove '-G'
+        if bs[key].is_a?(String)
+          bs[key] = bs[key].gsub('-G', '')
+        end
+
+        # If it's an array, map and remove '-G' from each string element
+        if bs[key].is_a?(Array)
+          bs[key] = bs[key].map { |v| v.is_a?(String) ? v.gsub('-G', '') : v }
+        end
+      end
+    end
+  end
+end
