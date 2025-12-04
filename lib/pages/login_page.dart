@@ -11,53 +11,42 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
   bool _loading = false;
 
   @override
   void dispose() {
     _emailCtrl.dispose();
-    _passwordCtrl.dispose();
+    _passCtrl.dispose();
     super.dispose();
-  }
-
-  String? _validateEmail(String? v) {
-    if (v == null || v.trim().isEmpty) return 'Enter email';
-    final regex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-    return regex.hasMatch(v.trim()) ? null : 'Enter a valid email';
-  }
-
-  String? _validatePassword(String? v) {
-    if (v == null || v.isEmpty) return 'Enter password';
-    if (v.length < 6) return 'Password must be at least 6 characters';
-    return null;
   }
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
+
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailCtrl.text.trim(),
-        password: _passwordCtrl.text,
+        password: _passCtrl.text,
       );
+
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/dashboard');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Login successful')));
+
+      // IMPORTANT: Remove all previous routes and go to dashboard.
+      // This prevents the Splash from being shown again when user presses Back.
+      Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false);
     } on FirebaseAuthException catch (e) {
-      final msg = _mapFirebaseAuthError(e);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      _showError(_mapFirebaseAuthError(e));
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Unexpected error: $e')));
+      _showError('Unexpected error: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   String _mapFirebaseAuthError(FirebaseAuthException e) {
@@ -78,64 +67,56 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Login')),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: AppTheme.pagePadding,
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Welcome back',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    AppTheme.vSpace12,
-                    TextFormField(
-                      controller: _emailCtrl,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: AppTheme.inputDecoration(
-                        label: 'Email',
-                        hint: 'you@example.com',
+      backgroundColor: AppTheme.background,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: AppTheme.pagePadding,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width > 520 ? 520 : double.infinity),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Align(alignment: Alignment.topLeft, child: IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, color: Colors.white70))),
+                  const SizedBox(height: 6),
+                  const Center(child: Text('Login', style: TextStyle(fontSize: 34, fontWeight: FontWeight.w700))),
+                  const SizedBox(height: 18),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(children: [
+                          TextFormField(
+                            controller: _emailCtrl,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: const InputDecoration(prefixIcon: Icon(Icons.email), hintText: 'Email'),
+                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter email' : null,
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _passCtrl,
+                            obscureText: true,
+                            decoration: const InputDecoration(prefixIcon: Icon(Icons.lock), hintText: 'Password'),
+                            validator: (v) => (v == null || v.isEmpty) ? 'Enter password' : null,
+                          ),
+                          const SizedBox(height: 12),
+                          Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () => Navigator.pushNamed(context, '/forgot'), child: const Text('Forgot Password?', style: TextStyle(color: Colors.white70)))),
+                          const SizedBox(height: 6),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _loading ? null : _login,
+                              child: _loading ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('LOGIN'),
+                            ),
+                          ),
+                        ]),
                       ),
-                      style: const TextStyle(color: Colors.white),
-                      validator: _validateEmail,
                     ),
-                    AppTheme.vSpace8,
-                    TextFormField(
-                      controller: _passwordCtrl,
-                      obscureText: true,
-                      decoration: AppTheme.inputDecoration(label: 'Password'),
-                      style: const TextStyle(color: Colors.white),
-                      validator: _validatePassword,
-                    ),
-                    AppTheme.vSpace16,
-                    ElevatedButton(
-                      onPressed: _loading ? null : _login,
-                      child: _loading
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Login'),
-                    ),
-                    AppTheme.vSpace8,
-                    TextButton(
-                      onPressed: () => Navigator.pushNamed(context, '/forgot'),
-                      child: const Text('Forgot password?'),
-                    ),
-                    const Divider(color: Colors.white24),
-                    OutlinedButton(
-                      onPressed: () => Navigator.pushNamed(context, '/signup'),
-                      child: const Text('Create an account'),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 12),
+                  Center(child: TextButton(onPressed: () => Navigator.pushNamed(context, '/signup'), child: const Text('Create an account', style: TextStyle(color: Colors.white70)))),
+                ],
               ),
             ),
           ),

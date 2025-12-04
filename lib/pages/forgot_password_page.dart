@@ -10,91 +10,62 @@ class ForgotPasswordPage extends StatefulWidget {
 
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailCtr = TextEditingController();
+  final _email = TextEditingController();
   bool _loading = false;
 
   @override
   void dispose() {
-    _emailCtr.dispose();
+    _email.dispose();
     super.dispose();
-  }
-
-  String? _validateEmail(String? v) {
-    if (v == null || v.trim().isEmpty) return 'Enter email';
-    final regex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-    return regex.hasMatch(v.trim()) ? null : 'Enter a valid email';
   }
 
   Future<void> _sendReset() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(
-        email: _emailCtr.text.trim(),
-      );
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: _email.text.trim());
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Password reset email sent. Check your inbox.'),
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password reset email sent.')));
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? 'Failed to send reset email')),
-      );
+      _show(e.message ?? e.code);
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      _show('Unexpected error');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
+  void _show(String m) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Reset password')),
-      body: Center(
-        child: Padding(
+      backgroundColor: AppTheme.background,
+      body: SafeArea(
+        child: SingleChildScrollView(
           padding: AppTheme.pagePadding,
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Reset password',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    AppTheme.vSpace12,
-                    TextFormField(
-                      controller: _emailCtr,
-                      decoration: AppTheme.inputDecoration(label: 'Email'),
-                      validator: _validateEmail,
-                    ),
-                    AppTheme.vSpace16,
-                    ElevatedButton(
-                      onPressed: _loading ? null : _sendReset,
-                      child: _loading
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Send reset email'),
-                    ),
-                  ],
+          child: Column(children: [
+            Align(alignment: Alignment.topLeft, child: IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, color: Colors.white70))),
+            const SizedBox(height: 12),
+            const Text('Forgot Password?', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            const Text('Enter your email address to receive a reset link.', style: TextStyle(color: Colors.white70)),
+            const SizedBox(height: 18),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(18.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(children: [
+                    TextFormField(controller: _email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(hintText: 'Email address'), validator: (v) => (v == null || v.isEmpty) ? 'Required' : null),
+                    const SizedBox(height: 16),
+                    SizedBox(width: double.infinity, child: ElevatedButton(onPressed: _loading ? null : _sendReset, child: _loading ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('RECOVER'))),
+                  ]),
                 ),
               ),
             ),
-          ),
+          ]),
         ),
       ),
     );

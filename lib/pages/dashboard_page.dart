@@ -1,259 +1,284 @@
+// lib/pages/dashboard_page.dart
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
-class DashboardPage extends StatefulWidget {
+class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
 
-  @override
-  State<DashboardPage> createState() => _DashboardPageState();
-}
+  final double _balance = 29000.45;
 
-class _DashboardPageState extends State<DashboardPage> {
-  double _balance = 29000.45;
-  final List<_DummyTxn> _txns = [
-    const _DummyTxn(title: 'Groceries', subtitle: 'Walmart • Today', amount: -54.20),
-    const _DummyTxn(title: 'Salary', subtitle: 'Company Inc • 2 days ago', amount: 2500.00),
-    const _DummyTxn(title: 'Coffee', subtitle: 'Cafe Latte • Yesterday', amount: -3.50),
-    const _DummyTxn(title: 'Freelance', subtitle: 'Design work • 5 days ago', amount: 120.00),
-  ];
-
-  final List<double> _chartValues = [1200, 800, 1800, 900, 2400, 1500];
-
-  String _fmt(double v) {
-    final sign = v < 0 ? '-' : '';
-    final abs = v.abs().toStringAsFixed(2);
-    return '$sign\$${abs}';
-  }
-
-  // ----------------- SEND / REQUEST logic -----------------
-  Future<void> _showSendDialog() async {
-    final formKey = GlobalKey<FormState>();
-    final amtCtrl = TextEditingController();
-    final toCtrl = TextEditingController();
-    final noteCtrl = TextEditingController();
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Send Money'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(controller: toCtrl, decoration: const InputDecoration(labelText: 'To (recipient)'), validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter recipient' : null),
-              TextFormField(
-                controller: amtCtrl,
-                decoration: const InputDecoration(labelText: 'Amount'),
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Enter amount';
-                  final n = double.tryParse(v.trim());
-                  if (n == null || n <= 0) return 'Enter valid amount';
-                  if (n > _balance) return 'Insufficient balance';
-                  return null;
-                },
-              ),
-              TextFormField(controller: noteCtrl, decoration: const InputDecoration(labelText: 'Note (optional)')),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(context, true);
-              }
-            },
-            child: const Text('Send'),
-          ),
-        ],
-      ),
-    );
-
-    if (result == true) {
-      final amt = double.parse(amtCtrl.text.trim());
-      final to = toCtrl.text.trim();
-      final note = noteCtrl.text.trim();
-      setState(() {
-        _balance -= amt;
-        _txns.insert(0, _DummyTxn(title: 'Sent to $to', subtitle: note.isEmpty ? 'Transfer' : note, amount: -amt));
-        // Optionally update chart values - here we just push a small recent value
-        _chartValues.removeAt(0);
-        _chartValues.add((_chartValues.last * 0.8).clamp(100.0, 3000.0));
-      });
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Sent ${_fmt(amt)} to $to')));
-    }
-  }
-
-  Future<void> _showRequestDialog() async {
-    final formKey = GlobalKey<FormState>();
-    final amtCtrl = TextEditingController();
-    final fromCtrl = TextEditingController();
-    final noteCtrl = TextEditingController();
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Request Money'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(controller: fromCtrl, decoration: const InputDecoration(labelText: 'From (who)'), validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter name' : null),
-              TextFormField(
-                controller: amtCtrl,
-                decoration: const InputDecoration(labelText: 'Amount'),
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Enter amount';
-                  final n = double.tryParse(v.trim());
-                  if (n == null || n <= 0) return 'Enter valid amount';
-                  return null;
-                },
-              ),
-              TextFormField(controller: noteCtrl, decoration: const InputDecoration(labelText: 'Note (optional)')),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(context, true);
-              }
-            },
-            child: const Text('Request'),
-          ),
-        ],
-      ),
-    );
-
-    if (result == true) {
-      final amt = double.parse(amtCtrl.text.trim());
-      final from = fromCtrl.text.trim();
-      final note = noteCtrl.text.trim();
-      setState(() {
-        // We add a positive "requested" transaction but do NOT change balance.
-        _txns.insert(0, _DummyTxn(title: 'Request from $from', subtitle: note.isEmpty ? 'Requested' : note, amount: amt));
-      });
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Requested ${_fmt(amt)} from $from')));
-    }
-  }
-
-  // ----------------- UI -----------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // Drawer is provided and its items now navigate correctly
+      drawer: _buildDrawer(context),
       appBar: AppBar(
-        title: const Text('Dashboard'),
-        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        // Use Builder so Scaffold.of(context) finds the Scaffold
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu, color: Colors.white, size: 28),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: Icon(Icons.notifications, color: Colors.white, size: 26),
+          )
+        ],
       ),
+      backgroundColor: AppTheme.background,
       body: SafeArea(
-        child: Padding(
-          padding: AppTheme.pagePadding,
-          child: Column(
-            children: [
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 28,
-                        backgroundColor: AppTheme.primary,
-                        child: const Icon(Icons.account_balance_wallet, size: 28, color: Colors.black),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          const Text('Current Balance', style: TextStyle(fontSize: 14, color: Colors.white70)),
-                          const SizedBox(height: 6),
-                          Text('\$${_balance.toStringAsFixed(2)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                        ]),
-                      ),
-                      Column(children: [
-                        ElevatedButton(onPressed: _showSendDialog, child: const Text('SEND')),
-                        const SizedBox(height: 8),
-                        OutlinedButton(onPressed: _showRequestDialog, child: const Text('REQUEST')),
-                      ])
-                    ],
-                  ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: AppTheme.pagePadding,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Greeting
+                const Text(
+                  "Hi, User",
+                  style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
                 ),
-              ),
-              const SizedBox(height: 14),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text('Monthly overview', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 120,
-                      child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: _createBars(_chartValues)),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: List.generate(_chartValues.length, (i) => Text('M${i + 1}', style: const TextStyle(fontSize: 12, color: Colors.white70)))),
-                  ]),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Row(children: const [Text('Recent Transactions', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))]),
-              const SizedBox(height: 8),
-              Expanded(
-                child: ListView.separated(
-                  itemCount: _txns.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final t = _txns[index];
-                    final isIncome = t.amount >= 0;
-                    return Card(
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: isIncome ? Colors.green.shade800 : Colors.red.shade800,
-                          child: Icon(isIncome ? Icons.arrow_downward : Icons.arrow_upward, color: Colors.white),
-                        ),
-                        title: Text(t.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                        subtitle: Text(t.subtitle, style: const TextStyle(color: Colors.white70)),
-                        trailing: Text(_fmt(t.amount), style: TextStyle(color: isIncome ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.bold)),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
+                const SizedBox(height: 4),
+                const Text("Welcome back", style: TextStyle(color: Colors.white70, fontSize: 16)),
+                const SizedBox(height: 20),
+
+                // Balance card
+                _buildBalanceCard(context),
+
+                const SizedBox(height: 20),
+
+                const Text("Recent Transactions", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 14),
+
+                // Transactions list (example items)
+                _buildTransaction("Salary", "Company Inc", 2500.00),
+                const SizedBox(height: 12),
+                _buildTransaction("Groceries", "Walmart", -54.20),
+                const SizedBox(height: 12),
+                _buildTransaction("Freelance", "Design work", 120.00),
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // Fixed: ensure barHeight is a double (clamp returns num)
-  List<Widget> _createBars(List<double> values) {
-    final max = values.reduce((a, b) => a > b ? a : b);
-    return values.map((v) {
-      final heightFactor = max == 0 ? 0.1 : (v / max);
-      final double barHeight = (heightFactor * 100).clamp(10, 100).toDouble();
-      return Expanded(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-            Container(height: barHeight, width: double.infinity, decoration: BoxDecoration(color: AppTheme.primary, borderRadius: BorderRadius.circular(6))),
+  // ---------------- Drawer ------------------
+  // Note: this function needs the BuildContext to perform navigation and close drawer.
+  Widget _buildDrawer(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final displayEmail = user?.email ?? 'Guest';
+
+    return Drawer(
+      backgroundColor: AppTheme.surface,
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header with user info
+            DrawerHeader(
+              margin: EdgeInsets.zero,
+              decoration: const BoxDecoration(color: Colors.transparent),
+              child: Row(children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: AppTheme.primary),
+                  child: const Icon(Icons.person, color: Colors.black, size: 36),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(displayEmail, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    const Text("View profile", style: TextStyle(color: Colors.white70, fontSize: 13)),
+                  ]),
+                ),
+              ]),
+            ),
+
+            // Navigation items
+            _drawerTile(
+              icon: Icons.person,
+              title: 'Profile',
+              onTap: () {
+                Navigator.pop(context); // close drawer
+                // navigate to profile route
+                Navigator.pushNamed(context, '/profile');
+              },
+            ),
+            _drawerTile(
+              icon: Icons.account_balance_wallet,
+              title: 'Wallet',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/dashboard'); // or '/wallet' if you have separate
+              },
+            ),
+            _drawerTile(
+              icon: Icons.swap_horiz,
+              title: 'Exchange',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/exchange');
+              },
+            ),
+            _drawerTile(
+              icon: Icons.payment,
+              title: 'Pay Bills',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/pay_bills');
+              },
+            ),
+            const Divider(color: Colors.white12, height: 28, thickness: 1),
+            _drawerTile(
+              icon: Icons.settings,
+              title: 'Settings',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/settings');
+              },
+            ),
+            _drawerTile(
+              icon: Icons.help_outline,
+              title: 'Help Center',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/help'); // create a '/help' page or change route
+              },
+            ),
+
+            const Spacer(),
+
+            // Logout button at bottom
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12),
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.danger,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                icon: const Icon(Icons.logout),
+                label: const Text('Logout'),
+                onPressed: () async {
+                  // Close drawer first
+                  Navigator.pop(context);
+
+                  // Sign out from Firebase
+                  await FirebaseAuth.instance.signOut();
+
+                  // Remove all routes and go to login (replace with your login route)
+                  if (context.mounted) {
+                    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                  }
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _drawerTile({required IconData icon, required String title, required VoidCallback onTap}) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.white70),
+      title: Text(title, style: const TextStyle(color: Colors.white)),
+      onTap: onTap,
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
+  // ---------------- Balance Card ------------------
+  Widget _buildBalanceCard(BuildContext context) {
+    return Card(
+      color: AppTheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 6,
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Balance', style: TextStyle(color: Colors.white70)),
+          const SizedBox(height: 6),
+          Text('\$${_balance.toStringAsFixed(2)}', style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: Colors.white)),
+          const SizedBox(height: 14),
+
+          // Chart placeholder box
+          Container(
+            height: 110,
+            decoration: BoxDecoration(color: const Color(0xFF0D0D0D), borderRadius: BorderRadius.circular(12)),
+            alignment: Alignment.center,
+            child: const Text('Chart placeholder', style: TextStyle(color: Colors.white24)),
+          ),
+
+          const SizedBox(height: 16),
+
+          Row(children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => Navigator.pushNamed(context, '/pay_bills'), // wire to send flow or contacts
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: BorderSide(color: AppTheme.primary, width: 1.6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('SEND'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => Navigator.pushNamed(context, '/contacts'), // request flow
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: BorderSide(color: AppTheme.primary, width: 1.6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('REQUEST'),
+              ),
+            ),
+          ]),
+        ]),
+      ),
+    );
+  }
+
+  // ---------------- Transactions ------------------
+  Widget _buildTransaction(String title, String subtitle, double amount) {
+    final isIncome = amount >= 0;
+    final amountText = '${isIncome ? '+' : '-'}\$${amount.abs().toStringAsFixed(2)}';
+
+    return Container(
+      decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(14)),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(children: [
+        CircleAvatar(
+          radius: 22,
+          backgroundColor: isIncome ? Colors.green.shade700 : Colors.red.shade700,
+          child: Icon(isIncome ? Icons.arrow_downward : Icons.arrow_upward, color: Colors.white),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            Text(subtitle, style: const TextStyle(color: Colors.white60, fontSize: 13)),
           ]),
         ),
-      );
-    }).toList();
+        Text(amountText, style: TextStyle(color: isIncome ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.bold)),
+      ]),
+    );
   }
-}
-
-class _DummyTxn {
-  final String title;
-  final String subtitle;
-  final double amount;
-  const _DummyTxn({required this.title, required this.subtitle, required this.amount});
 }
